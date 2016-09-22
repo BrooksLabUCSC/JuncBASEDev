@@ -1,4 +1,4 @@
-#!/broad/software/free/Linux/redhat_5_x86_64/pkgs/python_2.5.4/bin/python
+#!/usr/bin/env python
 # run_preProcess_by_chr_step1.py
 # Author: Angela Brooks
 # Program Completion Date:
@@ -19,6 +19,9 @@ from subprocess import Popen, PIPE
 
 from helperFunctions import runCmd, waitForChildren
 from preProcess_getASEventReadCounts_by_chr import getReferences, formatChr
+
+from multiprocessing.pool import ThreadPool
+
 #############
 # CONSTANTS #
 #############
@@ -26,7 +29,7 @@ BIN_DIR = os.path.realpath(os.path.dirname(sys.argv[0]))
 SCRIPT = "%s/preProcess_getASEventReadCounts_by_chr.py" % BIN_DIR
 
 DEF_NUM_PROCESSES = 1
-SHELL = "/bin/tcsh"
+SHELL = "/bin/bash"
 #################
 # END CONSTANTS #
 #################
@@ -122,6 +125,7 @@ def main():
 
     ctr = 0
     children = []
+    tp = ThreadPool(num_processes)
     for line in input_file:
         line = formatLine(line)
 
@@ -180,6 +184,10 @@ def main():
 
         ctr += 1
 
+        print(cmd)
+        sys.stdout.flush()
+        tp.apply_async(launchCMD, (cmd,))
+        '''
         if ctr % num_processes == 0:
             print cmd
 #            runCmd(cmd, SHELL, True)
@@ -195,11 +203,12 @@ def main():
             sys.stdout.flush()
             p = Popen(cmd, shell=True, executable=SHELL)
             children.append(p)
-
+        '''
    
     # Finish the last of the jobs
-    waitForChildren(children) 
-
+    #waitForChildren(children) 
+    tp.close()
+    tp.join()
     sys.stdout.flush()
     sys.exit(0)
 
@@ -220,6 +229,11 @@ def formatLine(line):
     line = line.replace("\r","")
     line = line.replace("\n","")
     return line
+
+def launchCMD(CMD):
+#    os.system(CMD)
+    p = Popen(CMD,shell=True)
+    p.wait()
 
 #################
 # END FUNCTIONS #	
