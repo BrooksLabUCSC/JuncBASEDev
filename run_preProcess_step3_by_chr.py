@@ -1,4 +1,4 @@
-#!/broad/software/free/Linux/redhat_5_x86_64/pkgs/python_2.5.4/bin/python
+#!/usr/bin/env python
 # run_preProcess_step3_by_chr.py
 # Author: Angela Brooks
 # Program Completion Date:
@@ -15,10 +15,12 @@ import pdb
 
 from subprocess import Popen
 from helperFunctions import runCmd, runLSF
+
+from multiprocessing.pool import ThreadPool
 #############
 # CONSTANTS #
 #############
-SHELL = "/bin/tcsh"
+SHELL = "/bin/bash"
 
 BIN_DIR = os.path.realpath(os.path.dirname(sys.argv[0]))
 SCRIPT = "%s/preProcess_getASEventReadCounts_step3.py" % BIN_DIR
@@ -148,7 +150,9 @@ def main():
     
     # Now go through each sample directory to get to subdirectory, then run
     # command
-    ctr = 0 # For num processes
+#    ctr = 0 # For num processes
+    tp = ThreadPool(num_processes)
+
     for sample_dir in os.listdir(input_dir):
         if not os.path.isdir(input_dir + "/" + sample_dir):
             continue
@@ -177,7 +181,7 @@ def main():
                 if file_is_present:
                     continue 
 
-            ctr += 1
+#            ctr += 1
 
             cmd = "python %s " % SCRIPT
             cmd += "-i %s/%s " % (input_dir, sample_dir)
@@ -185,24 +189,14 @@ def main():
             cmd += "-t %s/tmp_%s_preProcess_getASEventReadCounts_step2.bed " % (input_dir,
                                                                                 this_chr)
             cmd += "--min_overhang %d" % options.min_overhang
-
-            if num_processes:
-                if nice:
-                    cmd = "nice " + cmd
-                if ctr % num_processes == 0:
-                    os.system(cmd)
-                else:
-                    print cmd
-                    Popen(cmd, shell=True, executable=SHELL)
-            else:
-                tmp_file = "%s/tmp.txt" % os.curdir
-                runLSF(cmd,  
-                       "%s_%s.preProcess_3.bsub.out" % (sample_dir, this_chr),
-                       "%s_%s" % (sample_dir, this_chr),
-                       lsf_queue,
-                       group=lsf_group,
-                       tmp_file_name=tmp_file)
-
+            
+            print(cmd)
+            sys.stdout.flush()
+            tp.apply_async(launchCMD, (cmd,))
+            
+    tp.close()
+    tp.join()
+    sys.stdout.flush()
     sys.exit(0)
 
 ############
@@ -222,6 +216,11 @@ def formatLine(line):
     line = line.replace("\r","")
     line = line.replace("\n","")
     return line
+
+def launchCMD(CMD):
+#    os.system(CMD)
+    p = Popen(CMD,shell=True)
+    p.wait()
 
 #################
 # END FUNCTIONS #	
